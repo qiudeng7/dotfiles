@@ -1,0 +1,196 @@
+# Oh My Zsh: classic built-in theme and Git helpers.
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="robbyrussell"
+plugins=(git fzf fzf-tab)
+
+# Keep startup predictable; update manually with `omz update`.
+zstyle ':omz:update' mode disabled
+source "$ZSH/oh-my-zsh.sh"
+
+# robbyrussell only shows the current directory (%c); keep the style but
+# abbreviate every parent to its first letter, e.g. ~/w/f/src.
+setopt prompt_subst
+
+prompt_pwd_short() {
+  local path=${PWD/#$HOME/\~}
+  local out="" prefix=""
+  local -a parts
+
+  if [[ $path == "~" || $path == "/" ]]; then
+    print -n -- "$path"
+    return
+  fi
+  [[ $path == /* ]] && prefix="/"
+  parts=(${(s:/:)path})
+  (( $#parts )) && [[ -z $parts[1] ]] && parts=(${parts[2,-1]})
+
+  local -i i n=$#parts
+  for (( i = 1; i <= n; i++ )); do
+    if (( i == n )); then
+      out+=$parts[i]
+      break
+    fi
+    local part=$parts[i]
+    if [[ $part == "~" ]]; then
+      out+=$part
+    elif [[ $part == .?* ]]; then
+      out+=".${part[2]}"
+    else
+      out+=${part[1]}
+    fi
+    out+="/"
+  done
+  print -n -- "$prefix$out"
+}
+
+PROMPT="%(?:%{$fg_bold[green]%}%1{➜%} :%{$fg_bold[red]%}%1{➜%} ) %{$fg[cyan]%}\$(prompt_pwd_short)%{$reset_color%}"
+PROMPT+=' $(git_prompt_info)'
+
+# History
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=10000
+SAVEHIST=10000
+
+# Core zsh behavior: fewer keystrokes, stricter globbing, shared history.
+setopt autocd extendedglob nomatch interactive_comments
+setopt share_history inc_append_history hist_ignore_dups hist_reduce_blanks
+setopt HIST_IGNORE_SPACE
+
+# Completion: arrow-selectable menu, case-insensitive matching.
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# CJK-aware word editing: Ctrl+Backspace, ^W, Alt+Backspace, Ctrl+arrows.
+source "$HOME/.config/zsh/cjk-word.zsh"
+
+# User commands take precedence over system commands.
+typeset -U path
+path=("$HOME/.local/bin" $path)
+export PATH
+
+alias ls='ls --color=auto'
+alias ll='ls -la --color=auto'
+alias grep='grep --color=auto'
+alias tt="ttt"
+alias zshrc="vim ~/.zshrc"
+alias reload="source ~/.zshrc"
+alias c="clear"
+
+# Clash (clash-for-linux-install). Upstream scripts are Bash-only, so run them
+# through a Bash bridge; clashon/clashoff sync proxy vars into this Zsh.
+export CLASHCTL_HOME=/home/qiudeng/clashctl
+
+_clashctl_bash() {
+  bash -c '. "$CLASHCTL_HOME/scripts/cmd/clashctl.sh" && "$1" "${@:2}"' -- "$@"
+}
+
+clashon() {
+  local capture=1
+  case ${1-} in
+  -s | --service-only | -h | --help) capture=0 ;;
+  esac
+
+  if (( ! capture )); then
+    _clashctl_bash clashon "$@"
+    return
+  fi
+
+  local dump
+  dump=$(
+    bash -c '
+      . "$CLASHCTL_HOME/scripts/cmd/clashctl.sh" || exit
+      clashon "$@" 1>&2 || exit
+      for v in http_proxy HTTP_PROXY https_proxy HTTPS_PROXY \
+               all_proxy ALL_PROXY no_proxy NO_PROXY; do
+        eval "val=\${$v}"
+        [[ -n $val ]] && printf "export %s=%q\n" "$v" "$val"
+      done
+    ' -- "$@"
+  ) || return
+  eval "$dump"
+}
+
+clashoff() {
+  local drop_env=1
+  case ${1-} in
+  -s | --service-only | -h | --help) drop_env=0 ;;
+  esac
+
+  _clashctl_bash clashoff "$@"
+  local rc=$?
+  if (( drop_env )); then
+    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY \
+      all_proxy ALL_PROXY no_proxy NO_PROXY
+  fi
+  return $rc
+}
+
+clashctl() {
+  local sub=${1:-help}
+  if (( $# )); then shift; fi
+  case $sub in -h | --help | help) sub=help ;; esac
+  _clashctl_bash "clash$sub" "$@"
+}
+
+# Direct clash<command> shortcuts, mirroring the Bash functions in cmd/*.sh.
+for _clash_file in "$CLASHCTL_HOME"/scripts/cmd/*.sh(N); do
+  _clash_name=${_clash_file:t:r}
+  case $_clash_name in clashctl | on | off) continue ;; esac
+  eval "clash${_clash_name}() { _clashctl_bash clash${_clash_name} \"\$@\"; }"
+done
+unset _clash_file _clash_name
+
+# Local secrets stay outside chezmoi and Git.
+if [[ -r "$HOME/.secrets.env" ]]; then
+  source "$HOME/.secrets.env"
+fi
+
+# Claude Code / Codex provider switchers.
+claude-mirror() {
+  if [[ -z "${CLAUDE_MIRROR_KEY-}" ]]; then
+    print -u2 -- "Missing CLAUDE_MIRROR_KEY; set it in ~/.secrets.env"
+    return 1
+  fi
+  export ANTHROPIC_BASE_URL="https://api.aicodemirror.ai/api/claudecode"
+  export ANTHROPIC_API_KEY="$CLAUDE_MIRROR_KEY"
+  export ANTHROPIC_AUTH_TOKEN="$CLAUDE_MIRROR_KEY"
+  exec claude "$@"
+}
+
+claude-ds() {
+  if [[ -z "${DEEPSEEK_KEY-}" ]]; then
+    print -u2 -- "Missing DEEPSEEK_KEY; set it in ~/.secrets.env"
+    return 1
+  fi
+  export ANTHROPIC_BASE_URL="https://api.deepseek.com/anthropic"
+  export ANTHROPIC_API_KEY="$DEEPSEEK_KEY"
+  export ANTHROPIC_AUTH_TOKEN="$DEEPSEEK_KEY"
+  export ANTHROPIC_MODEL="deepseek-flash[1m]"
+  export CLAUDE_CODE_EFFORT_LEVEL=max
+  exec claude "$@"
+}
+
+codex-ds() {
+  if [[ -z "${DEEPSEEK_KEY-}" ]]; then
+    print -u2 -- "Missing DEEPSEEK_KEY; set it in ~/.secrets.env"
+    return 1
+  fi
+  export DEEPSEEK_API_KEY="$DEEPSEEK_KEY"
+  exec codex -p deepseek "$@"
+}
+
+# zoxide: frecency-based `z <dir>` jumping.
+if (( $+commands[zoxide] )); then
+  eval "$(zoxide init zsh)"
+fi
+
+# Syntax highlighting must be sourced last, after compinit and other plugins.
+if [[ -r /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
+  source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+fi
+
+
+# Zellij auto-start, except in vscode  terminal
+if [[ "$TERM_PROGRAM" != vscode && -z "$VSCODE_SHELL_INTEGRATION" ]]; then
+  eval "$(zellij setup --generate-auto-start zsh)"
+fi

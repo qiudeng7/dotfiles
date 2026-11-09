@@ -1,0 +1,13 @@
+# Repository documentation stays in the source directory.
+README.md
+THIRD-PARTY-NOTICES.md
+
+# Local credentials must never be managed.
+.secrets.env
+
+# Keep the existing Vim plugin local, not in dotfiles.
+.vim/plugin/cjk-word.vim
+
+# Python bytecode is generated locally.
+**/__pycache__/**
+**/*.pyc

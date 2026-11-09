@@ -1,0 +1,16 @@
+[user]
+	name = qiudeng
+	email = 2143975743@qq.com
+[credential "https://github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[core]
+	hooksPath = /home/qiudeng/.config/git/hooks
+	editor = vim
+[init]
+	defaultBranch = main
+[alias]
+	lg = log --graph --oneline --decorate --all

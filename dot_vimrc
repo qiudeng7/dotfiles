@@ -1,0 +1,14 @@
+
+" 行号和相对行号
+set number
+" set relativenumber
+
+syntax enable " 语法高亮
+
+set hlsearch " 高亮搜索结果
+
+
+:set scrolloff=10 " 向下滚动光标的时候，提前 N 行就开始滚动屏幕
+
+" 普通模式下允许光标停在行尾一个字符之外（cjk-word.vim 的行尾停靠依赖它）
+set virtualedit=onemore

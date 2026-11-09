@@ -1,0 +1,6 @@
+# Defense in depth: do not commit local secrets or their chezmoi source forms.
+.secrets.env
+dot_secrets.env
+private_dot_secrets.env
+**/__pycache__/
+*.pyc

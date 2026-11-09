@@ -1,0 +1,10 @@
+#!/bin/sh
+# Inject only Wrangler credentials from Infisical common.
+exec infisical run \
+  --domain=https://infisical.qiudeng.ink/api \
+  --projectId=ba39c666-4dba-40c8-a383-9198be60ef9c \
+  --env=the-only-one \
+  --path=/cloudflare/wrangler \
+  --include-imports=false \
+  --expand=false \
+  -- wrangler "$@"
