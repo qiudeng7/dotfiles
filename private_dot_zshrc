@@ -179,6 +179,12 @@ codex-ds() {
   exec codex -p deepseek "$@"
 }
 
+# Vite+ paths. The installer looks for this "$HOME/.config/vite-plus/env"
+# reference and skips appending its own block to .zshrc.
+if [[ -r "$HOME/.config/vite-plus/env" ]]; then
+  source "$HOME/.config/vite-plus/env"
+fi
+
 # zoxide: frecency-based `z <dir>` jumping.
 if (( $+commands[zoxide] )); then
   eval "$(zoxide init zsh)"
